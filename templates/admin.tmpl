@@ -2,17 +2,52 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>{{.title}}</title>
+		<title>{{%.title%}}</title>
+		<link rel="stylesheet" type="text/css" href="/assets/bootstrap.min.css">
+		<link rel="stylesheet" type="text/css" href="/assets/admin.css">
+		<link rel="stylesheet" type="text/css" href="/assets/animate.css">
+		<script src="/assets/angular.js"></script>
+		<script src="/assets/angular-file-upload.min.js"></script>
+		<script src="/assets/angular-file-upload-shim.min.js"></script>
+		<script src="/assets/admin.js"></script>
 	</head>
-	<body>
-		<h1>{{.title}}</h1>
-		<p>
-			{{.content}}
-		</p>
-		<form action="/admin/upload" method="post" enctype="multipart/form-data">
-			<label for="file">Filename:</label>
-			<input type="file" name="file" id="file">
-			<input type="submit" name="submit" value="Submit">
-		</form>
+	<body ng-app="drop" ng-controller="dropController" ng-file-drop ng-model="myFiles" class="drop-box" 
+				drag-over-class="{accept:'dragover', reject:'dragover-err', delay:100}"
+				multiple="true" allow-dir="true" accept="image/*,application/pdf">
+		<div class="container">
+			<h1>{{%.title%}}</h1>
+			<form enctype="multipart/form-data">
+				<button ng-file-select ng-model="myFiles" multiple="true">Attach Any File</button>
+				<div ng-no-file-drop>File Farg/Drop is not supported for this browser</div>
+			</form>
+			<div ng-repeat="f in files">
+				<div class="row fileRow">
+					<form class="form-inline" ng-submit="update(f)">
+						<div class="form-group hitCount col-md-2">
+							{{f.HitCount}} HITS
+						</div>
+						<div class="form-group fileName col-md-2">
+							<a href="/f/{{f.Slug}}">{{f.FileName}}</a>
+						</div>
+						<div class="form-group">
+							<input type="text" class="form-control" ng-model="f.Name" placeholder="Name">
+						</div>
+						<div class="form-group">
+							<input type="text" class="form-control" ng-model="f.Slug" placeholder="Slug" required>
+						</div>
+						<div class="form-group">
+							<input type="text" ng-show="f.ShowPassword == true" class="form-control" ng-model="f.Password" placeholder="Password">
+							<a href="javascript:void(0)" ng-click="f.ShowPassword = true" ng-hide="f.ShowPassword==true" class="btn btn-default">Show Password</a>
+						</div>
+						<div class="form-group">
+							<label>
+								<input type="checkbox" ng-model="f.Active"> Active
+							</label>
+						</div>
+						<button type="submit" class="btn btn-default">Update</button>
+					</form>
+				</div>
+			</div>
+		</div>
 	</body>
 </html>

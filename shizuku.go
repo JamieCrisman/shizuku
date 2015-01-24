@@ -13,6 +13,7 @@ import (
     "net/http"
     "strings"
     "time"
+    "encoding/json"
 )
 
 type Nanika struct {
@@ -27,13 +28,16 @@ type Nanika struct {
 // Binding from form values
 type NaniForm struct {
     Name     string `form:"name" binding:"optional"`
+    FileName string `form:"filename" binding:"optional"`
     Slug 	 string `form:"slug" binding:"optional"`
     Password string `form:"password" binding:"optional"`
     Active   bool   `form:"active" binding:"optional"`
 }
 
 var (
+    templateDelims = []string{"{{%", "%}}"}
 	IsDrop = true
+    //templates *template.Template
 )
 
 var Contains = func(list []string, elem string) bool { 
@@ -43,7 +47,7 @@ var Contains = func(list []string, elem string) bool {
 
 func main() {
     r := gin.Default()
-    html := template.Must(template.ParseFiles("./templates/index.tmpl","./templates/admin.tmpl"))
+    html := template.Must(template.New("").Delims(templateDelims[0], templateDelims[1]).ParseFiles("./templates/index.tmpl","./templates/admin.tmpl"))
     r.SetHTMLTemplate(html)
     r.Static("/assets","./public")
 
@@ -76,14 +80,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	/*
+	
     err = db.Insert(&Nanika{Name: "SomeName", FileName: "some/file/name",HitCount: 0, Slug: "Slugtest", Password: "password", Active: true},
     	&Nanika{Name: "SomeOtherName", FileName: "some/other/file/name",HitCount: 200, Slug: "Slugtest2", Password: "password2", Active: false},
     	&Nanika{Name: "SomeOther3Name", FileName: "some/other2/file/name",HitCount: 200, Slug: "Slugtest3", Password: "", Active: true})
 	if err != nil {
 		panic(err)
 	}
-	*/
+	
 	/*
     result := []Nanika{}
     err = db.Find(nil).All(&result)
@@ -110,6 +114,13 @@ func main() {
         	fmt.Println("err finding slug")
         	c.HTML(500, "index.tmpl", obj)
         	return
+        }
+
+        colQuerier := bson.M{"slug": c.Params.ByName("slug")}
+        change := bson.M{"$set": bson.M{"hitcount": ret.HitCount+1}}
+        err = db.Update(colQuerier, change)
+        if err != nil {
+            panic(err)
         }
         http.ServeFile(c.Writer, c.Request, "./uploaded/"+ret.FileName)
 
@@ -140,7 +151,21 @@ func main() {
     })
 
     authorized.PUT("/file", func(c *gin.Context){
-    	//TODO search file and get update
+        defer c.Request.Body.Close()
+        var v NaniForm
+        if err := json.NewDecoder(c.Request.Body).Decode(&v); err != nil {
+          panic(err)
+        }
+        fmt.Println(v)
+
+
+        colQuerier := bson.M{"filename": v.FileName}
+        change := bson.M{"$set": bson.M{"slug": v.Slug, "name": v.Name, "active": v.Active, "password": v.Password}}
+        err = db.Update(colQuerier, change)
+        if err != nil {
+            panic(err)
+        }
+
     	c.JSON(200, gin.H{"ok": "Updated"})
     })
 	authorized.DELETE("/file", func(c *gin.Context){
