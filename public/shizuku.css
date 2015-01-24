@@ -37,6 +37,13 @@ body{
 	border-radius: 100px;
 }
 
+.password-circle{
+	width: 300px;
+}
+.password-i-circle{
+	padding: 20px 30px;
+}
+
 .footer{
 	font-size: 10px;
 	color: #aaa;

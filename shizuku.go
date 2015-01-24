@@ -36,7 +36,7 @@ type NaniForm struct {
 
 var (
     templateDelims = []string{"{{%", "%}}"}
-	IsDrop = true
+	IsDrop = false
     //templates *template.Template
 )
 
@@ -47,7 +47,7 @@ var Contains = func(list []string, elem string) bool {
 
 func main() {
     r := gin.Default()
-    html := template.Must(template.New("").Delims(templateDelims[0], templateDelims[1]).ParseFiles("./templates/index.tmpl","./templates/admin.tmpl"))
+    html := template.Must(template.New("").Delims(templateDelims[0], templateDelims[1]).ParseFiles("./templates/index.tmpl","./templates/admin.tmpl", "./templates/passwordedFile.tmpl"))
     r.SetHTMLTemplate(html)
     r.Static("/assets","./public")
 
@@ -60,14 +60,6 @@ func main() {
     defer session.Close()
     session.SetMode(mgo.Monotonic, true)
  
-	// Drop Database if true
-	if IsDrop {
-		err = session.DB("shizuku").DropDatabase()
-		if err != nil {
-			panic(err)
-		}
-	}
-
     db := session.DB("shizuku").C("nanika")
    	index := mgo.Index{
 		Key:        []string{"name", "slug"},
@@ -81,12 +73,20 @@ func main() {
 		panic(err)
 	}
 	
-    err = db.Insert(&Nanika{Name: "SomeName", FileName: "some/file/name",HitCount: 0, Slug: "Slugtest", Password: "password", Active: true},
-    	&Nanika{Name: "SomeOtherName", FileName: "some/other/file/name",HitCount: 200, Slug: "Slugtest2", Password: "password2", Active: false},
-    	&Nanika{Name: "SomeOther3Name", FileName: "some/other2/file/name",HitCount: 200, Slug: "Slugtest3", Password: "", Active: true})
-	if err != nil {
-		panic(err)
-	}
+    // Drop Database if true
+    if IsDrop {
+        err = session.DB("shizuku").DropDatabase()
+        if err != nil {
+            panic(err)
+        }
+        err = db.Insert(&Nanika{Name: "SomeName", FileName: "some/file/name",HitCount: 0, Slug: "Slugtest", Password: "password", Active: true},
+        &Nanika{Name: "SomeOtherName", FileName: "some/other/file/name",HitCount: 200, Slug: "Slugtest2", Password: "password2", Active: false},
+        &Nanika{Name: "SomeOther3Name", FileName: "some/other2/file/name",HitCount: 200, Slug: "Slugtest3", Password: "", Active: true})
+        if err != nil {
+            panic(err)
+        }
+    }
+  
 	
 	/*
     result := []Nanika{}
@@ -106,26 +106,61 @@ func main() {
     })
 
 	r.GET("/f/:slug", func(c *gin.Context) {
-        obj := gin.H{"title": c.Params.ByName("slug")}
         ret := Nanika{}
         fmt.Println("slug is: "+ c.Params.ByName("slug"))
-        err := db.Find(bson.M{"slug": c.Params.ByName("slug")}).One(&ret)
+        err := db.Find(bson.M{"slug": c.Params.ByName("slug"), "active": true}).One(&ret)
         if(err != nil){
         	fmt.Println("err finding slug")
-        	c.HTML(500, "index.tmpl", obj)
-        	return
+        	c.Redirect(301, "/")
+        	//return
         }
 
+        if(ret.Password != ""){
+            obj := gin.H{"title": ret.Name}
+            c.HTML(200, "passwordedFile.tmpl", obj)
+        }else{
+            colQuerier := bson.M{"slug": c.Params.ByName("slug")}
+            change := bson.M{"$set": bson.M{"hitcount": ret.HitCount+1}}
+            err = db.Update(colQuerier, change)
+            if err != nil {
+                panic(err)
+            }
+            http.ServeFile(c.Writer, c.Request, "./uploaded/"+ret.FileName)
+        }
+
+        //c.HTML(200, "index.tmpl", obj)
+    })
+
+    r.POST("/f/:slug", func(c *gin.Context) {
+        ret := Nanika{}
+        fmt.Println("slug is: "+ c.Params.ByName("slug"))
+        err := db.Find(bson.M{"slug": c.Params.ByName("slug"), "active": true}).One(&ret)
+        if(err != nil){
+            fmt.Println("err finding slug")
+            c.Redirect(301, "/")
+            return
+        }
+        var form NaniForm
+        c.BindWith(&form, binding.Form)
+        fmt.Println(form.Password)
+        if(ret.Password != form.Password){
+            obj := gin.H{"title": "bad password for file " +ret.Name}
+            c.HTML(200,"passwordedFile.tmpl", obj)
+            return
+        }
         colQuerier := bson.M{"slug": c.Params.ByName("slug")}
         change := bson.M{"$set": bson.M{"hitcount": ret.HitCount+1}}
         err = db.Update(colQuerier, change)
         if err != nil {
             panic(err)
         }
+        
         http.ServeFile(c.Writer, c.Request, "./uploaded/"+ret.FileName)
+        
 
         //c.HTML(200, "index.tmpl", obj)
     })
+
     // Group using gin.BasicAuth() middleware
     // gin.Accounts is a shortcut for map[string]string
     authorized := r.Group("/admin", gin.BasicAuth(gin.Accounts{
@@ -170,8 +205,28 @@ func main() {
     })
 	authorized.DELETE("/file", func(c *gin.Context){
     	//TODO find file
+        defer c.Request.Body.Close()
+        var v NaniForm
+        if err := json.NewDecoder(c.Request.Body).Decode(&v); err != nil {
+          panic(err)
+        }
+        fmt.Println(v)
+        //remove record from db
+        colQuerier := bson.M{"filename": v.FileName}
+        //change := bson.M{"$set": bson.M{"slug": v.Slug, "name": v.Name, "active": v.Active, "password": v.Password}}
+        err = db.Remove(colQuerier)
+        if err != nil {
+            panic(err)
+            c.JSON(500, gin.H{"ok": "trouble deleting file from db"})
+            return
+        }
     	//delete file
-    	//remove record from db
+        err = os.Remove(v.FileName)
+        if err != nil {
+            panic(err)
+            c.JSON(500, gin.H{"ok": "trouble deleting file from system"})
+            return
+        }
     	c.JSON(200, gin.H{"ok": "Deleted"})
     })
 

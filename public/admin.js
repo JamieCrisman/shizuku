@@ -17,7 +17,25 @@ app.controller('dropController', function($scope, $http, $upload){
 	}
 	
 	getFiles();
-
+	$scope.remove = function(file){
+		console.log("DELETING!");
+		var req = {
+			method: 'DELETE',
+			url: '/admin/file',
+			headers: {
+				'Content-Type': undefined
+			},
+			data: file
+		}
+		console.log(req);
+		$http(req).success(function(data){
+			console.log(data);
+			getFiles();
+		}).error(function(data){
+			console.log(data);
+			getFiles();
+		});
+	}
 	$scope.update = function(file){
 		console.log(file);
 		var req = {
