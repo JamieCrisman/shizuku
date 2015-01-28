@@ -79,26 +79,13 @@ func main() {
         if err != nil {
             panic(err)
         }
-        err = db.Insert(&Nanika{Name: "SomeName", FileName: "some/file/name",HitCount: 0, Slug: "Slugtest", Password: "password", Active: true},
-        &Nanika{Name: "SomeOtherName", FileName: "some/other/file/name",HitCount: 200, Slug: "Slugtest2", Password: "password2", Active: false},
-        &Nanika{Name: "SomeOther3Name", FileName: "some/other2/file/name",HitCount: 200, Slug: "Slugtest3", Password: "", Active: true})
-        if err != nil {
-            panic(err)
-        }
+        //err = db.Insert(&Nanika{Name: "SomeName", FileName: "some/file/name",HitCount: 0, Slug: "Slugtest", Password: "password", Active: true},
+        //&Nanika{Name: "SomeOtherName", FileName: "some/other/file/name",HitCount: 200, Slug: "Slugtest2", Password: "password2", Active: false},
+        //&Nanika{Name: "SomeOther3Name", FileName: "some/other2/file/name",HitCount: 200, Slug: "Slugtest3", Password: "", Active: true})
+        //if err != nil {
+        //    panic(err)
+        //}
     }
-  
-	
-	/*
-    result := []Nanika{}
-    err = db.Find(nil).All(&result)
-    if err != nil {
-    	fmt.Println("Oh gosh! Didn't find it")
-        log.Fatal(err)
-    }
-
-    //fmt.Println("Name: ", result.Name)
-    fmt.Println("what we pulled from db: ", result)
-	*/
 
     r.GET("/", func(c *gin.Context) {
         obj := gin.H{"title": "Apa!"}
@@ -163,8 +150,12 @@ func main() {
 
     // Group using gin.BasicAuth() middleware
     // gin.Accounts is a shortcut for map[string]string
+    if(os.Getenv("SHIZUKU_PASSWORD") == ""){
+        fmt.Println("Unable to find env var for SHIZUKU_PASSWORD")
+        return
+    }
     authorized := r.Group("/admin", gin.BasicAuth(gin.Accounts{
-        "apa":    "opa", 																											//TODO make this run from env var
+        "apa":    os.Getenv("SHIZUKU_PASSWORD"), 																											//TODO make this run from env var
     }))
     
 
